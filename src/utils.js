@@ -1,6 +1,116 @@
 import * as tf from "@tensorflow/tfjs";
 
-export function preprocessData(data) {
+import {
+  shuffle,
+  max,
+  min,
+  mean,
+  standardDeviation,
+  sampleCorrelation
+} from "simple-statistics";
+
+export function getDatasetByColumns(dataset) {
+  const numberOfColumns = dataset[0].length;
+  const columnsData = [];
+  for (var i = 0; i < numberOfColumns; i++) {
+    const column = dataset.map(x => x[i]);
+    columnsData.push(column);
+  }
+  return columnsData;
+}
+
+export function getCovarianceMatrix(dataset) {
+  const columnData = getDatasetByColumns(dataset);
+  const numberOfColumns = columnData.length;
+  const covariances = [];
+  for (var i = 0; i < numberOfColumns; i++) {
+    const covariances_column_i = [];
+    for (var j = 0; j < numberOfColumns; j++) {
+      covariances_column_i.push(
+        sampleCorrelation(columnData[i], columnData[j])
+      );
+    }
+    covariances.push(covariances_column_i);
+  }
+  return covariances;
+}
+
+export function standardizeData(data) {
+  const numberOfColumns = data[0].length;
+  const numberOfRows = data.length;
+  let meanvals = [];
+  let stdvals = [];
+  for (var k = 0; k < numberOfColumns; k++) {
+    const col = data.map(x => x[k]);
+    meanvals.push(mean(col));
+    stdvals.push(standardDeviation(col));
+  }
+  const standardized = [];
+  for (var i = 0; i < numberOfRows; i++) {
+    const row = [];
+    for (var j = 0; j < numberOfColumns; j++) {
+      row.push((data[i][j] - meanvals[j]) / stdvals[j]);
+    }
+    standardized.push(row);
+  }
+  return standardized;
+}
+
+export function normalizeData(data) {
+  const numberOfColumns = data[0].length;
+  const numberOfRows = data.length;
+  let maxvals = [];
+  let minvals = [];
+  for (var k = 0; k < numberOfColumns; k++) {
+    const col = data.map(x => x[k]);
+    maxvals.push(max(col));
+    minvals.push(min(col));
+  }
+  const normalized = [];
+  for (var i = 0; i < numberOfRows; i++) {
+    const row = [];
+    for (var j = 0; j < numberOfColumns; j++) {
+      row.push((data[i][j] - minvals[j]) / (maxvals[j] - minvals[j]));
+    }
+    normalized.push(row);
+  }
+  return normalized;
+}
+
+export function getR2Score(predict, data) {
+  data = data.map(x => Number(x));
+  predict = predict.map(x => Number(x));
+
+  var meanValue = 0;
+  var SStot = 0;
+  var SSres = 0;
+  var rSquared = 0;
+
+  for (var n = 0; n < data.length; n++) {
+    meanValue += data[n];
+  }
+  meanValue = meanValue / data.length;
+
+  for (var m = 0; m < data.length; m++) {
+    SStot += Math.pow(data[m] - meanValue, 2);
+    SSres += Math.pow(predict[m] - data[m], 2);
+  }
+
+  rSquared = 1 - SSres / SStot;
+
+  return {
+    meanValue: meanValue,
+    SStot: SStot,
+    SSres: SSres,
+    rSquared: rSquared
+  };
+}
+
+export function shuffleData(data) {
+  return shuffle(data);
+}
+
+export function preprocessRemoveEmptyAndNull(data) {
   data = data.filter(x => !Object.values(x).some(y => y === "" || y == null));
   return data;
 }
@@ -40,93 +150,45 @@ export function convertToTensors(x_train, x_test, y_train, y_test) {
   return tensors;
 }
 
-export function getBasicModel(inputSize, outputSize, modelParams) {
-  const model = tf.sequential();
-  model.add(
-    tf.layers.dense({
-      units: 10,
-      activation: modelParams.activation,
-      inputShape: [inputSize]
-    })
-  );
-  model.add(
-    tf.layers.dense({ units: outputSize, activation: modelParams.activation })
-  );
-  return model;
+export function preprocess(data, sensorConfig, modelParams) {
+  let newData = refactorRawData(data);
+  newData = preprocessRemoveEmptyAndNull(newData);
+  newData = shuffleData(newData);
+  let [features, targets] = getFeatureTargetSplit(newData, sensorConfig);
+  return getTestTrainSplit(features, targets, modelParams.test_train_split);
 }
 
-export function getComplexModel(inputSize, outputSize, modelParams) {
-  const model = tf.sequential();
-  model.add(
-    tf.layers.dense({
-      units: 10,
-      activation: modelParams.activation,
-      inputShape: [inputSize]
-    })
-  );
-  model.add(
-    tf.layers.dense({
-      units: 5,
-      activation: modelParams.activation
-    })
-  );
-  model.add(
-    tf.layers.dense({ units: outputSize, activation: modelParams.activation })
-  );
-  return model;
+export function refactorRawData(data) {
+  let newData = [];
+  const headers = data[0];
+  data.slice(1, -1).forEach(function(values, index) {
+    let result = {};
+    headers.forEach((key, i) => (result[key] = values[i]));
+    newData.push(result);
+  });
+  return newData;
 }
 
-export function getBasicModelWithRegularization(
+export function getSequentialModel(
+  numberOfUnits,
   inputSize,
   outputSize,
-  modelParams
+  activation,
+  outputActivation
 ) {
   const model = tf.sequential();
+  numberOfUnits.forEach(layerUnits => {
+    model.add(
+      tf.layers.dense({
+        kernelRegularizer: tf.regularizers.L1L2,
+        units: layerUnits,
+        activation: activation,
+        inputShape: [inputSize]
+      })
+    );
+  });
   model.add(
-    tf.layers.dense({
-      kernelRegularizer: tf.regularizers.L1L2,
-      units: 10,
-      activation: modelParams.activation,
-      inputShape: [inputSize]
-    })
-  );
-  model.add(
-    tf.layers.dense({
-      kernelRegularizer: tf.regularizers.L1L2,
-      units: outputSize,
-      activation: modelParams.activation
-    })
-  );
-  return model;
-}
-
-export function getComplexModelWithRegularization(
-  inputSize,
-  outputSize,
-  modelParams
-) {
-  const model = tf.sequential();
-  model.add(
-    tf.layers.dense({
-      kernelRegularizer: tf.regularizers.L1L2,
-      units: 10,
-      activation: modelParams.activation,
-      inputShape: [inputSize]
-    })
-  );
-  model.add(
-    tf.layers.dense({
-      kernelRegularizer: tf.regularizers.L1L2,
-      units: 5,
-      activation: modelParams.activation
-    })
-  );
-  model.add(
-    tf.layers.dense({
-      kernelRegularizer: tf.regularizers.L1L2,
-      units: outputSize,
-      activation: modelParams.activation
-    })
+    tf.layers.dense({ units: outputSize, activation: outputActivation })
   );
   return model;
 }

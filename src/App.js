@@ -1,45 +1,26 @@
 import "./App.css";
 import React, { useState } from "react";
 import CSVReader from "react-csv-reader";
-import AddSensor from "./AddSensor.js";
+import { AddSensor, addSensorFunc } from "./AddSensor.js";
 
 import * as tf from "@tensorflow/tfjs";
 import * as tfvis from "@tensorflow/tfjs-vis";
 
 import {
-  getR2Score,
-  normalizeData,
-  standardizeData,
-  getCovarianceMatrix,
-  getReducedDataset,
-  shuffleData,
-  fillConfigWithDataValues,
-  shouldStandardize
-} from "./statLib.js";
-
-import {
-  getFeatureTargetSplit,
-  getTestTrainSplit,
   convertToTensors,
-  getBasicModel,
-  getComplexModel,
-  getBasicModelWithRegularization,
-  getComplexModelWithRegularization,
-  preprocessData
+  getR2Score,
+  preprocess,
+  getSequentialModel
 } from "./utils.js";
 
 const modelParams = {
+  batchSize: 128 * 2 * 2,
   test_train_split: 0.2,
-  activation: "relu",
   learningRate: 0.01,
   epochs: 10,
   optimizer: tf.train.adam(0.01),
-  loss: "meanSquaredError",
+  loss: "meanAbsoluteError",
   min_R2_score: 0.5,
-  decent_R2_score: 0.8,
-  max_mean_diff: 100,
-  max_std_diff: 10,
-  cov_limit: 0.9,
   max_iterations: 4
 };
 
@@ -50,8 +31,12 @@ function App() {
   const [sensorConfig, setSensorConfig] = useState(null);
 
   const [R2, setR2] = useState(-1000);
-  const [trainingFailed, setTrainingFailed] = useState(false);
   const [hasTrained, setHasTrained] = useState(false);
+
+  const [isTraining, setIsTraining] = useState(false);
+
+  const [processedData, setProcessedData] = useState([]);
+  const [trainedModel, setTrainedModel] = useState(null);
 
   const selectDataset = data => {
     setHasSelectedDataset(true);
@@ -59,101 +44,37 @@ function App() {
     setSensorNames(data[0]);
   };
 
-  console.log(sensorConfig);
+  async function trainModel(x_train, x_val, y_train, y_val) {
+    setIsTraining(true);
 
-  function addSensorFunc(sensor, type) {
-    let config = [];
-    let obj = {
-      [sensor]: {
-        name: sensor,
-        type: type
-      }
-    };
-    config["sensors"] =
-      sensorConfig !== null ? { ...sensorConfig["sensors"], ...obj } : [];
-    config["input"] = [];
-    config["output"] = [];
-    config["internal"] = [];
-    Object.keys(config.sensors).forEach(x =>
-      config[config.sensors[x].type].push(config.sensors[x].name)
+    const tensors = convertToTensors(x_train, x_val, y_train, y_val);
+
+    let model = await fitModel(
+      tensors.trainFeatures,
+      tensors.trainTargets,
+      tensors.testFeatures,
+      tensors.testTargets
     );
-    setSensorConfig(config);
-  }
-
-  function organizeData(data) {
-    let newData = [];
-    const headers = data[0];
-    console.log("headers: ", headers);
-    data.slice(1, -1).forEach(function(values, index) {
-      let result = {};
-      headers.forEach((key, i) => (result[key] = values[i]));
-      newData.push(result);
-    });
-    return newData;
-  }
-
-  async function performModelTraining() {
-    console.log("Hei");
-    console.log(dataPoints);
-
-    let data = organizeData(dataPoints);
-
-    console.log(data);
-
-    fillConfigWithDataValues(data, sensorConfig);
-    data = shuffleData(data);
-
-    let [features, targets] = getFeatureTargetSplit(data, sensorConfig);
-
-    console.log("features, processed", features);
-    console.log("targets, processed", targets);
-
-    const [x_train, x_test, y_train, y_test] = getTestTrainSplit(
-      features,
-      targets,
-      modelParams.test_train_split
+    setTrainedModel(model);
+    setR2(
+      getR2Score(model.predict(tensors.testFeatures).arraySync(), y_val)
+        .rSquared
     );
 
-    const tensors = convertToTensors(x_train, x_test, y_train, y_test);
-
-    let model;
-    let predictions;
-    let tempR2 = 0;
-    let trainCounter = 0;
-    while (tempR2 < modelParams.min_R2_score) {
-      model = await trainModel(
-        tensors.trainFeatures,
-        tensors.trainTargets,
-        tensors.testFeatures,
-        tensors.testTargets
-      );
-      console.log("Before predict: ", model);
-      predictions = model.predict(tensors.testFeatures);
-      //console.log("PREDICT", predictions);
-      tempR2 = getR2Score(predictions.arraySync(), y_test).rSquared;
-      console.log("R2 score", tempR2);
-      setR2(tempR2);
-      if (!hasTrained) {
-        setHasTrained(true);
-      }
-      trainCounter += 1;
-      if (
-        trainCounter > modelParams.max_iterations &&
-        !(tempR2 >= modelParams.min_R2_score)
-      ) {
-        setTrainingFailed(true);
-        break;
-      }
-    }
+    setHasTrained(true);
+    setIsTraining(false);
   }
 
-  async function trainModel(xTrain, yTrain, xTest, yTest) {
-    console.log(xTrain);
-    console.log(yTrain);
+  async function fitModel(xTrain, yTrain, xVal, yVal) {
+    let model = getSequentialModel(
+      [128],
+      xTrain.shape[1],
+      yTrain.shape[1],
+      "relu",
+      "linear"
+    );
 
-    let model = getComplexModel(xTrain.shape[1], yTrain.shape[1], modelParams);
-
-    console.log("Model:", model);
+    console.log("Model:", model.summary());
 
     model.summary();
     model.compile({
@@ -162,15 +83,30 @@ function App() {
     });
 
     const lossContainer = document.getElementById("lossCanvas");
-    const callbacks = tfvis.show.fitCallbacks(lossContainer, ["loss"], {
-      callbacks: ["onEpochEnd"]
-    });
+    const callbacks = tfvis.show.fitCallbacks(
+      lossContainer,
+      ["loss", "val_loss"],
+      {
+        callbacks: ["onEpochEnd", "onBatchEnd"]
+      }
+    );
     await model.fit(xTrain, yTrain, {
+      batchSize: modelParams.batchSize,
       epochs: modelParams.epochs,
-      validationData: [xTest, yTest],
+      validationData: [xVal, yVal],
       callbacks: callbacks
     });
     return model;
+  }
+
+  async function performModelTraining() {
+    const [x_train, x_val, y_train, y_val] = preprocess(
+      dataPoints,
+      sensorConfig,
+      modelParams
+    );
+    setProcessedData([x_train, x_val, y_train, y_val]);
+    trainModel(x_train, x_val, y_train, y_val);
   }
 
   return (
@@ -182,20 +118,28 @@ function App() {
 
       <div className="step">
         <p>Step 2: Choose values for sensors</p>
-        <table>
-          <tbody>
-            <tr>
-              <th className="TableField">Sensor name</th>
-              <th className="TableField">Input</th>
-              <th className="TableField">Output</th>
-              <th className="TableField">Exclude</th>
-            </tr>
-            {sensorNames &&
-              sensorNames.map(sensor => (
-                <AddSensor key={sensor} sensor={sensor} func={addSensorFunc} />
-              ))}
-          </tbody>
-        </table>
+        {sensorNames != null && (
+          <table>
+            <tbody>
+              <tr>
+                <th className="TableField">Sensor name</th>
+                <th className="TableField">Input</th>
+                <th className="TableField">Output</th>
+                <th className="TableField">Exclude</th>
+              </tr>
+              {sensorNames &&
+                sensorNames.map(sensor => (
+                  <AddSensor
+                    key={sensor}
+                    sensor={sensor}
+                    func={addSensorFunc}
+                    sensorConfig={sensorConfig}
+                    setFunc={setSensorConfig}
+                  />
+                ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <div className="step">
@@ -203,10 +147,22 @@ function App() {
         <button className="react-csv-input" onClick={performModelTraining}>
           Init model training
         </button>
+
         <div>
           <h4>Loss</h4>
           <div className="canvases" id="lossCanvas"></div>
         </div>
+        {hasTrained && (
+          <div>
+            <p>R-squared score: {R2.toFixed(5)}</p>
+            <button
+              className="buttonStyle"
+              onClick={() => trainModel(...processedData)}
+            >
+              Retrain model
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
