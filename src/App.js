@@ -16,8 +16,9 @@ import {
 const modelParams = {
   batchSize: 128 * 2 * 2,
   test_train_split: 0.2,
+  validation_split: 0.2,
   learningRate: 0.01,
-  epochs: 10,
+  epochs: 200,
   optimizer: tf.train.adam(0.01),
   loss: "meanAbsoluteError",
   min_R2_score: 0.5,
@@ -44,20 +45,15 @@ function App() {
     setSensorNames(data[0]);
   };
 
-  async function trainModel(x_train, x_val, y_train, y_val) {
+  async function trainModel(x_train, x_test, y_train, y_test) {
     setIsTraining(true);
 
-    const tensors = convertToTensors(x_train, x_val, y_train, y_val);
+    const tensors = convertToTensors(x_train, x_test, y_train, y_test);
 
-    let model = await fitModel(
-      tensors.trainFeatures,
-      tensors.trainTargets,
-      tensors.testFeatures,
-      tensors.testTargets
-    );
+    let model = await fitModel(tensors.trainFeatures, tensors.trainTargets);
     setTrainedModel(model);
     setR2(
-      getR2Score(model.predict(tensors.testFeatures).arraySync(), y_val)
+      getR2Score(model.predict(tensors.testFeatures).arraySync(), y_test)
         .rSquared
     );
 
@@ -65,7 +61,7 @@ function App() {
     setIsTraining(false);
   }
 
-  async function fitModel(xTrain, yTrain, xVal, yVal) {
+  async function fitModel(xTrain, yTrain) {
     let model = getSequentialModel(
       [128],
       xTrain.shape[1],
@@ -93,20 +89,20 @@ function App() {
     await model.fit(xTrain, yTrain, {
       batchSize: modelParams.batchSize,
       epochs: modelParams.epochs,
-      validationData: [xVal, yVal],
+      validationSplit: modelParams.validation_split,
       callbacks: callbacks
     });
     return model;
   }
 
   async function performModelTraining() {
-    const [x_train, x_val, y_train, y_val] = preprocess(
+    const [x_train, x_test, y_train, y_test] = preprocess(
       dataPoints,
       sensorConfig,
       modelParams
     );
-    setProcessedData([x_train, x_val, y_train, y_val]);
-    trainModel(x_train, x_val, y_train, y_val);
+    setProcessedData([x_train, x_test, y_train, y_test]);
+    trainModel(x_train, x_test, y_train, y_test);
   }
 
   return (
