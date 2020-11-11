@@ -65,16 +65,36 @@ td {
 
 .step p {
   padding: 0;
-  margin: 0;
+  margin-top: 0px;
+  margin-bottom: 0px;
 }
 
 .step {
   padding-bottom: 30px;
   padding-top: 30px;
+  text-align: center;
 }
 
 .canvases {
   min-width: 500px;
+}
+
+.smalltext {
+  font-size: 14px;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.midtext {
+  font-size: 20px;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.green {
+  color: green;
 }
 
 @keyframes App-logo-spin {

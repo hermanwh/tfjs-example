@@ -18,7 +18,7 @@ const modelParams = {
   test_train_split: 0.2,
   validation_split: 0.2,
   learningRate: 0.01,
-  epochs: 200,
+  epochs: 10,
   optimizer: tf.train.adam(0.01),
   loss: "meanAbsoluteError",
   min_R2_score: 0.5,
@@ -26,6 +26,8 @@ const modelParams = {
 };
 
 function App() {
+  const [step, setStep] = useState(1);
+
   const [dataPoints, setDataPoints] = useState(null);
   const [sensorNames, setSensorNames] = useState(null);
   const [hasSelectedDataset, setHasSelectedDataset] = useState(false);
@@ -43,6 +45,7 @@ function App() {
     setHasSelectedDataset(true);
     setDataPoints(data);
     setSensorNames(data[0]);
+    setStep(2);
   };
 
   async function trainModel(x_train, x_test, y_train, y_test) {
@@ -96,6 +99,7 @@ function App() {
   }
 
   async function performModelTraining() {
+    setStep(3);
     const [x_train, x_test, y_train, y_test] = preprocess(
       dataPoints,
       sensorConfig,
@@ -108,49 +112,120 @@ function App() {
   return (
     <div className="App">
       <div className="step">
-        <p>Step 1: Upload dataset in .csv format</p>
+        <p className="midtext">
+          This small web application shows an entry-level example of machine
+          learning performed directly in the browser using{" "}
+          <a href="https://www.tensorflow.org/js">TensorFlowJS</a> and{" "}
+          <a href="https://reactjs.org/">React</a>. A dataset in{" "}
+          <a href="https://en.wikipedia.org/wiki/Comma-separated_values">
+            .csv format
+          </a>{" "}
+          is parsed to a matrix of strings and converted to{" "}
+          <a href="https://www.tensorflow.org/guide/tensor">tensors</a>. Input
+          and output features may be adjusted by the user. A neural network
+          model with sensible default hyperparameters and structure is trained.
+          <br />
+          <br />
+          For implementation details, visit{" "}
+          <a href="https://github.com/hermanwh/tfjs-example">
+            the GitHub repository
+          </a>
+        </p>
+      </div>
+
+      <div className="step">
+        {step > 1 ? (
+          <p className="green">
+            1. Upload dataset in .csv format &nbsp; &#10004;
+          </p>
+        ) : (
+          <p>1. Upload dataset in .csv format</p>
+        )}
+        <p className="smalltext">
+          The first row of the file should contain the column headers. The
+          following rows should contain data values.
+        </p>
         <CSVReader cssClass="react-csv-input" onFileLoaded={selectDataset} />
       </div>
 
-      <div className="step">
-        <p>Step 2: Choose values for sensors</p>
-        {sensorNames != null && (
-          <table>
-            <tbody>
-              <tr>
-                <th className="TableField">Sensor name</th>
-                <th className="TableField">Input</th>
-                <th className="TableField">Output</th>
-                <th className="TableField">Exclude</th>
-              </tr>
-              {sensorNames &&
-                sensorNames.map(sensor => (
-                  <AddSensor
-                    key={sensor}
-                    sensor={sensor}
-                    func={addSensorFunc}
-                    sensorConfig={sensorConfig}
-                    setFunc={setSensorConfig}
-                  />
-                ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {step > 1 && (
+        <div className="step">
+          {step > 2 ? (
+            <p className="green">
+              2. Choose input and output features &nbsp; &#10004;
+            </p>
+          ) : (
+            <p>2. Choose input and output features</p>
+          )}
+          <p className="smalltext">
+            Any number of input features can be used to predict any number of
+            output features. Irrelevant dataset columns, e.g. time or index
+            columns, may be excluded. Features with no selected value are
+            ignored.
+          </p>
+          {sensorNames != null && (
+            <div>
+              <table>
+                <tbody>
+                  <tr>
+                    <th className="TableField">Feature name</th>
+                    <th className="TableField">Input</th>
+                    <th className="TableField">Output</th>
+                    <th className="TableField">Exclude</th>
+                  </tr>
+                  {sensorNames &&
+                    sensorNames.map(sensor => (
+                      <AddSensor
+                        key={sensor}
+                        sensor={sensor}
+                        func={addSensorFunc}
+                        sensorConfig={sensorConfig}
+                        setFunc={setSensorConfig}
+                      />
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {step > 1 && (
+        <div className="step">
+          {hasTrained ? (
+            <p className="green">
+              3. Train your neural network model &nbsp; &#10004;
+            </p>
+          ) : (
+            <p>3. Train your neural network model</p>
+          )}
+          <button className="react-csv-input" onClick={performModelTraining}>
+            Init model training
+          </button>
+        </div>
+      )}
 
       <div className="step">
-        <p>Step 3: Train model</p>
-        <button className="react-csv-input" onClick={performModelTraining}>
-          Init model training
-        </button>
-
         <div>
-          <h4>Loss</h4>
+          {step > 2 && (
+            <p className="smalltext">
+              The model is being trained for {modelParams.epochs} epochs in
+              batches of {modelParams.batchSize}
+            </p>
+          )}
           <div className="canvases" id="lossCanvas"></div>
         </div>
         {hasTrained && (
           <div>
             <p>R-squared score: {R2.toFixed(5)}</p>
+            <p className="smalltext">
+              The{" "}
+              <a href="https://en.wikipedia.org/wiki/Coefficient_of_determination">
+                R-squared metric
+              </a>{" "}
+              is a measure of how well observed outcomes are replicated by the
+              model.
+            </p>
             <button
               className="buttonStyle"
               onClick={() => trainModel(...processedData)}
