@@ -14,7 +14,7 @@ import {
 } from "./utils.js";
 
 const modelParams = {
-  batchSize: 128 * 2 * 2,
+  batchSize: 128 * 2 * 2 * 2,
   test_train_split: 0.2,
   validation_split: 0.2,
   learningRate: 0.01,
@@ -41,6 +41,9 @@ function App() {
   const [processedData, setProcessedData] = useState([]);
   const [trainedModel, setTrainedModel] = useState(null);
 
+  const [epochs, setEpochs] = useState(modelParams.epochs);
+  const [batchsize, setBatchsize] = useState(modelParams.batchSize);
+
   const selectDataset = data => {
     setHasSelectedDataset(true);
     setDataPoints(data);
@@ -66,20 +69,23 @@ function App() {
 
   async function fitModel(xTrain, yTrain) {
     let model = getSequentialModel(
-      [128],
+      [128, 128],
       xTrain.shape[1],
       yTrain.shape[1],
       "relu",
       "linear"
     );
 
-    console.log("Model:", model.summary());
-
     model.summary();
     model.compile({
       optimizer: modelParams.optimizer,
       loss: modelParams.loss
     });
+
+    if (modelParams.batchSize > xTrain.shape[0]) {
+      setBatchsize(32);
+      setEpochs(30);
+    }
 
     const lossContainer = document.getElementById("lossCanvas");
     const callbacks = tfvis.show.fitCallbacks(
@@ -89,9 +95,11 @@ function App() {
         callbacks: ["onEpochEnd", "onBatchEnd"]
       }
     );
+
     await model.fit(xTrain, yTrain, {
-      batchSize: modelParams.batchSize,
-      epochs: modelParams.epochs,
+      batchSize:
+        modelParams.batchSize > xTrain.shape[0] ? 32 : modelParams.batchSize,
+      epochs: modelParams.batchSize > xTrain.shape[0] ? 30 : modelParams.epochs,
       validationSplit: modelParams.validation_split,
       callbacks: callbacks
     });
@@ -205,12 +213,12 @@ function App() {
         </div>
       )}
 
-      <div className="step">
+      <div className="step" style={{ paddingTop: "0px" }}>
         <div>
           {step > 2 && (
             <p className="smalltext">
-              The model is being trained for {modelParams.epochs} epochs in
-              batches of {modelParams.batchSize}
+              The model is being trained for {epochs} epochs in batches of{" "}
+              {batchsize}.
             </p>
           )}
           <div className="canvases" id="lossCanvas"></div>
@@ -224,7 +232,8 @@ function App() {
                 R-squared metric
               </a>{" "}
               is a measure of how well observed outcomes are replicated by the
-              model.
+              model. 1.0 means perfect replication, while anything above 0.0
+              indicates the model performed better than a mean predictor.
             </p>
             <button
               className="buttonStyle"

@@ -177,13 +177,21 @@ export function getSequentialModel(
   outputActivation
 ) {
   const model = tf.sequential();
-  numberOfUnits.forEach(layerUnits => {
+  model.add(
+    tf.layers.dense({
+      kernelRegularizer: tf.regularizers.L1L2,
+      units: numberOfUnits[0],
+      activation: activation,
+      inputShape: [inputSize]
+    })
+  );
+  numberOfUnits.slice(1).forEach(layerUnits => {
     model.add(
       tf.layers.dense({
         kernelRegularizer: tf.regularizers.L1L2,
         units: layerUnits,
         activation: activation,
-        inputShape: [inputSize]
+        inputShape: [layerUnits]
       })
     );
   });
