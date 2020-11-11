@@ -123,19 +123,90 @@ function App() {
         <p className="midtext">
           This small web application shows an entry-level example of machine
           learning performed directly in the browser using{" "}
-          <a href="https://www.tensorflow.org/js">TensorFlowJS</a> and{" "}
-          <a href="https://reactjs.org/">React</a>. A dataset in{" "}
-          <a href="https://en.wikipedia.org/wiki/Comma-separated_values">
+          <a href="https://www.tensorflow.org/js" target="_blank">
+            TensorFlowJS
+          </a>{" "}
+          and{" "}
+          <a href="https://reactjs.org/" target="_blank">
+            React
+          </a>
+          . A dataset in{" "}
+          <a
+            href="https://en.wikipedia.org/wiki/Comma-separated_values"
+            target="_blank"
+          >
             .csv format
           </a>{" "}
           is parsed to a matrix of strings and converted to{" "}
-          <a href="https://www.tensorflow.org/guide/tensor">tensors</a>. Input
-          and output features may be adjusted by the user. A neural network
-          model with sensible default hyperparameters and structure is trained.
+          <a href="https://www.tensorflow.org/guide/tensor" target="_blank">
+            tensors
+          </a>
+          . Input and output{" "}
+          <a
+            href="https://en.wikipedia.org/wiki/Feature_(machine_learning)"
+            target="_blank"
+          >
+            features
+          </a>{" "}
+          may be adjusted by the user. A{" "}
+          <a
+            href="https://en.wikipedia.org/wiki/Artificial_neural_network"
+            target="_blank"
+          >
+            neural network
+          </a>{" "}
+          model with sensible default{" "}
+          <a
+            href="https://en.wikipedia.org/wiki/Hyperparameter_(machine_learning)"
+            target="_blank"
+          >
+            hyperparameters
+          </a>{" "}
+          and structure is trained.
+          <br />
+          <br />
+          For testing, I prepared the following datasets which you are advised
+          to use:
+          <br />
+          <a
+            href="https://github.com/hermanwh/tfjs-example/blob/main/iris_flower_dataset_extended.csv"
+            target="_blank"
+          >
+            Iris flower dataset
+          </a>{" "}
+          (direct download link:{" "}
+          <a
+            href="https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/hermanwh/tfjs-example/blob/main/iris_flower_dataset_extended.csv"
+            target="_blank"
+          >
+            link1
+          </a>
+          )
+          <br />
+          <a
+            href="https://github.com/hermanwh/tfjs-example/blob/main/mechanical_component_dataset.csv"
+            target="_blank"
+          >
+            hydraulic jack system
+          </a>{" "}
+          (direct downloiad link:{" "}
+          <a
+            href="https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/hermanwh/tfjs-example/blob/main/mechanical_component_dataset.csv"
+            target="_blank"
+          >
+            link2
+          </a>
+          ).
+          <br />
+          Download links from GitHub are created using{" "}
+          <a href="https://minhaskamal.github.io/DownGit" target="_blank">
+            https://minhaskamal.github.io/DownGit
+          </a>
+          .
           <br />
           <br />
           For implementation details, visit{" "}
-          <a href="https://github.com/hermanwh/tfjs-example">
+          <a href="https://github.com/hermanwh/tfjs-example" target="_blank">
             the GitHub repository
           </a>
         </p>
@@ -218,7 +289,11 @@ function App() {
           {step > 2 && (
             <p className="smalltext">
               The model is being trained for {epochs} epochs in batches of{" "}
-              {batchsize}.
+              {batchsize}. Epochs are the number of loops over the entirely
+              training data. Batch size is the number of dataset rows used to
+              calculate the stochastic gradient and perform weight updates. The
+              figures below are updated when a batch or epoch is finished,
+              respectively.
             </p>
           )}
           <div className="canvases" id="lossCanvas"></div>
@@ -241,6 +316,30 @@ function App() {
             >
               Retrain model
             </button>
+
+            <div className="step">
+              <p>So what now?</p>
+              <p className="smalltext">
+                Good question! Usually, the trained model would be evaluated
+                based on some metrics (R-squared is one such metric), and
+                perhaps even using empirical analysis and expert knowledge. If
+                deemed suitable, the model may be used to make predictions on
+                new, future data samples. The difference between measured and
+                predicted value can be used to derive fault models, e.g.
+                indicating component health in a mechanical or industrial
+                system. Using machine learning models in practice is a large and
+                active area of research. You can read about an attempt at using
+                neural network models for condition monitoring for the oil and
+                gas industry in{" "}
+                <a
+                  href="https://github.com/hermanwh/master-thesis"
+                  target="_black"
+                >
+                  my master thesis
+                </a>
+                .
+              </p>
+            </div>
           </div>
         )}
       </div>
