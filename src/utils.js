@@ -1,14 +1,9 @@
 import * as tf from "@tensorflow/tfjs";
 
-import {
-  shuffle,
-  max,
-  min,
-  mean,
-  standardDeviation,
-  sampleCorrelation
-} from "simple-statistics";
+import { shuffle } from "simple-statistics";
 
+// Because the data from our react-csv-reader as a rather strange format,
+// we have to parse it a bit before it can be
 export function getDatasetByColumns(dataset) {
   const numberOfColumns = dataset[0].length;
   const columnsData = [];
@@ -17,64 +12,6 @@ export function getDatasetByColumns(dataset) {
     columnsData.push(column);
   }
   return columnsData;
-}
-
-export function getCovarianceMatrix(dataset) {
-  const columnData = getDatasetByColumns(dataset);
-  const numberOfColumns = columnData.length;
-  const covariances = [];
-  for (var i = 0; i < numberOfColumns; i++) {
-    const covariances_column_i = [];
-    for (var j = 0; j < numberOfColumns; j++) {
-      covariances_column_i.push(
-        sampleCorrelation(columnData[i], columnData[j])
-      );
-    }
-    covariances.push(covariances_column_i);
-  }
-  return covariances;
-}
-
-export function standardizeData(data) {
-  const numberOfColumns = data[0].length;
-  const numberOfRows = data.length;
-  let meanvals = [];
-  let stdvals = [];
-  for (var k = 0; k < numberOfColumns; k++) {
-    const col = data.map(x => x[k]);
-    meanvals.push(mean(col));
-    stdvals.push(standardDeviation(col));
-  }
-  const standardized = [];
-  for (var i = 0; i < numberOfRows; i++) {
-    const row = [];
-    for (var j = 0; j < numberOfColumns; j++) {
-      row.push((data[i][j] - meanvals[j]) / stdvals[j]);
-    }
-    standardized.push(row);
-  }
-  return standardized;
-}
-
-export function normalizeData(data) {
-  const numberOfColumns = data[0].length;
-  const numberOfRows = data.length;
-  let maxvals = [];
-  let minvals = [];
-  for (var k = 0; k < numberOfColumns; k++) {
-    const col = data.map(x => x[k]);
-    maxvals.push(max(col));
-    minvals.push(min(col));
-  }
-  const normalized = [];
-  for (var i = 0; i < numberOfRows; i++) {
-    const row = [];
-    for (var j = 0; j < numberOfColumns; j++) {
-      row.push((data[i][j] - minvals[j]) / (maxvals[j] - minvals[j]));
-    }
-    normalized.push(row);
-  }
-  return normalized;
 }
 
 export function getR2Score(predict, data) {
@@ -104,10 +41,6 @@ export function getR2Score(predict, data) {
     SSres: SSres,
     rSquared: rSquared
   };
-}
-
-export function shuffleData(data) {
-  return shuffle(data);
 }
 
 export function preprocessRemoveEmptyAndNull(data) {
@@ -153,7 +86,7 @@ export function convertToTensors(x_train, x_test, y_train, y_test) {
 export function preprocess(data, sensorConfig, modelParams) {
   let newData = refactorRawData(data);
   newData = preprocessRemoveEmptyAndNull(newData);
-  newData = shuffleData(newData);
+  newData = shuffle(newData);
   let [features, targets] = getFeatureTargetSplit(newData, sensorConfig);
   return getTestTrainSplit(features, targets, modelParams.test_train_split);
 }
@@ -167,38 +100,6 @@ export function refactorRawData(data) {
     newData.push(result);
   });
   return newData;
-}
-
-export function getSequentialModel(
-  numberOfUnits,
-  inputSize,
-  outputSize,
-  activation,
-  outputActivation
-) {
-  const model = tf.sequential();
-  model.add(
-    tf.layers.dense({
-      kernelRegularizer: tf.regularizers.L1L2,
-      units: numberOfUnits[0],
-      activation: activation,
-      inputShape: [inputSize]
-    })
-  );
-  numberOfUnits.slice(1).forEach(layerUnits => {
-    model.add(
-      tf.layers.dense({
-        kernelRegularizer: tf.regularizers.L1L2,
-        units: layerUnits,
-        activation: activation,
-        inputShape: [layerUnits]
-      })
-    );
-  });
-  model.add(
-    tf.layers.dense({ units: outputSize, activation: outputActivation })
-  );
-  return model;
 }
 
 export default convertToTensors;

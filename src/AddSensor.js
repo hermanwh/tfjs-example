@@ -11,7 +11,7 @@ export function addSensorFunc(sensor, type, sensorConfig, setFunc) {
     }
   };
   config["sensors"] =
-    sensorConfig !== null ? { ...sensorConfig["sensors"], ...obj } : [];
+    sensorConfig !== null ? { ...sensorConfig["sensors"], ...obj } : { ...obj };
   config["input"] = [];
   config["output"] = [];
   config["internal"] = [];
@@ -33,21 +33,18 @@ export const AddSensor = props => {
         setOutputSensor(false);
         setInternalSensor(false);
         props.func(props.sensor, "input", props.sensorConfig, props.setFunc);
-        // save something to store here?
         break;
       case 1:
         setOutputSensor(true);
         setInputSensor(false);
         setInternalSensor(false);
         props.func(props.sensor, "output", props.sensorConfig, props.setFunc);
-        // save something to store here?
         break;
       case 2:
         setInternalSensor(true);
         setOutputSensor(false);
         setInputSensor(false);
         props.func(props.sensor, "internal", props.sensorConfig, props.setFunc);
-        // save something to store here?
         break;
       default:
         break;
