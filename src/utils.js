@@ -15,30 +15,34 @@ export function getDatasetByColumns(dataset) {
 }
 
 export function getR2Score(predict, data) {
-  data = data.map(x => Number(x));
-  predict = predict.map(x => Number(x));
+  let SSres_tot = 0;
+  let SStot_tot = 0;
+  for (let i = 0; i < data[0].length; i++) {
+    let d = data.map(x => Number(x[i]));
+    let p = predict.map(x => Number(x[i]));
 
-  var meanValue = 0;
-  var SStot = 0;
-  var SSres = 0;
-  var rSquared = 0;
+    let SStot = 0;
+    let SSres = 0;
 
-  for (var n = 0; n < data.length; n++) {
-    meanValue += data[n];
+    const meanValue =
+      d.reduce(function(pv, cv) {
+        return pv + cv;
+      }, 0) / d.length;
+
+    for (let m = 0; m < d.length; m++) {
+      SStot += Math.pow(d[m] - meanValue, 2);
+      SSres += Math.pow(p[m] - d[m], 2);
+    }
+
+    SSres_tot += SSres;
+    SStot_tot += SStot;
   }
-  meanValue = meanValue / data.length;
 
-  for (var m = 0; m < data.length; m++) {
-    SStot += Math.pow(data[m] - meanValue, 2);
-    SSres += Math.pow(predict[m] - data[m], 2);
-  }
-
-  rSquared = 1 - SSres / SStot;
+  let rSquared = 1 - SSres_tot / SStot_tot;
 
   return {
-    meanValue: meanValue,
-    SStot: SStot,
-    SSres: SSres,
+    SStot: SSres_tot,
+    SSres: SStot_tot,
     rSquared: rSquared
   };
 }
@@ -50,14 +54,21 @@ export function preprocessRemoveEmptyAndNull(data) {
 
 export function getFeatureTargetSplit(dataset, config) {
   const inputs = config.input;
-  const targets = dataset.map(x => [Number(x[config.output[0]])]);
+  const outputs = config.output;
   let features = [];
+  let targets = [];
   dataset.forEach(function(dataRow) {
-    let row = [];
+    let featureRow = [];
     inputs.forEach(function(inputName) {
-      row.push(Number(dataRow[inputName]));
+      featureRow.push(Number(dataRow[inputName]));
     });
-    features.push(row);
+    features.push(featureRow);
+
+    let targetRow = [];
+    outputs.forEach(function(outputName) {
+      targetRow.push(Number(dataRow[outputName]));
+    });
+    targets.push(targetRow);
   });
   return [features, targets];
 }

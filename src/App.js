@@ -20,11 +20,7 @@ const modelParams = {
   // the (initial) learning rate of the machine learning model, determines convergence rate and accuracy
   learningRate: 0.01,
   // number of entire loops over the training data
-  epochs: 10,
-  // the optimizer is the algorithm used to determine weight updates in the neural network
-  optimizer: tf.train.adam(0.01),
-  // model performance is said to increase if the loss metric decreases (usually)
-  loss: "meanAbsoluteError"
+  epochs: 10
 };
 
 function App() {
@@ -35,26 +31,47 @@ function App() {
   const [dataPoints, setDataPoints] = useState(null);
   const [sensorNames, setSensorNames] = useState(null);
   const [sensorConfig, setSensorConfig] = useState(null);
-
   const [R2, setR2] = useState(-1000);
   const [hasTrained, setHasTrained] = useState(false);
-
   const [isTraining, setIsTraining] = useState(false);
-
   const [processedData, setProcessedData] = useState([]);
   const [trainedModel, setTrainedModel] = useState(null);
-
   const [csvError, setCsvError] = useState(false);
-
   const [epochs, setEpochs] = useState(modelParams.epochs);
   const [batchsize, setBatchsize] = useState(modelParams.batchSize);
 
   const selectDataset = data => {
-    setCsvError(false);
     setDataPoints(data);
     setSensorNames(data[0]);
+    setSensorConfig(null);
+    resetState();
     setStep(2);
   };
+
+  function setSensorConfigWithStateReset(args) {
+    resetState();
+    setStep(2);
+    setSensorConfig(args);
+  }
+
+  function resetState() {
+    setR2(-1000);
+    setHasTrained(false);
+    setIsTraining(false);
+    setProcessedData([]);
+    setTrainedModel(null);
+    setCsvError(false);
+    setEpochs(modelParams.epochs);
+    setBatchsize(modelParams.batchSize);
+    resetLossContainer();
+  }
+
+  function resetLossContainer() {
+    const lossContainer = document.getElementById("lossCanvas");
+    while (lossContainer.firstChild) {
+      lossContainer.removeChild(lossContainer.lastChild);
+    }
+  }
 
   // Takes as parameters training and testing features (x) and targets (y)
   async function trainModel(x_train, x_test, y_train, y_test) {
@@ -140,8 +157,8 @@ function App() {
     model.summary();
     // Compile the model
     model.compile({
-      optimizer: modelParams.optimizer,
-      loss: modelParams.loss
+      optimizer: tf.train.adam(modelParams.learningRate),
+      loss: "meanAbsoluteError"
     });
 
     // If the provided dataset has very few rows (not desirable), we would like to
@@ -266,7 +283,7 @@ function App() {
                         sensor={sensor}
                         func={addSensorFunc}
                         sensorConfig={sensorConfig}
-                        setFunc={setSensorConfig}
+                        setFunc={setSensorConfigWithStateReset}
                       />
                     ))}
                 </tbody>
