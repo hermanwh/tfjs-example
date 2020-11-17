@@ -1,70 +1,149 @@
-# Getting Started with Create React App
+# View project on GitHub pages
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Available at the following URL: https://hermanwh.github.io/tfjs-example/
 
-## Available Scripts
+# How to parse .csv file loaded using [react-csv-reader](https://www.npmjs.com/package/react-csv-reader)
+NB: this guide is by no means optimal, and could certainly be improved through the use of more functional programming, e.g. map, filter etc.
 
-In the project directory, you can run:
+Assuming your file is in .csv format, with the top row containing the column headers and the following rows containing values for each column. When uploading data using react-csv-reader, you can call a function as follows:
 
-### `npm start`
+```javascript
+const [dataPoints, setDataPoints] = useState(null);
+...
+const selectDataset = data => 
+    // perform your actions, e.g. clearing your state variables
+    // and binding the data:
+    setDataPoints(data);
+    setSensorNames(data[0]);
+    setSensorConfig(null);
+    setProcessedData([]);
+  };
+  
+  ...
+  
+return (
+  ...
+  <CSVReader onFileLoaded={selectDataset} />
+  ...
+)
+```
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+After loading your file from the frontend using react-csv-reader, your data object will have the following array structure:
+```
+[
+  0: (4) ["sepallength", "sepalwidth", "petallength", "petalwidth"]
+  1: (4) ["5.1", "3.5", "1.4", "0.2"]
+  2: (4) ["4.9", "3.0", "1.4", "0.2"]
+  3: (4) ["4.7", "3.2", "1.3", "0.2"]
+  4: (4) ["4.6", "3.1", "1.5", "0.2"]
+  ...
+]
+```
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+Passing this structue to the following method (top row is sliced because it contains the headers, bottom row is slices because it is typically just a newline):
+```javascript
+function refactorRawData(data) {
+  let newData = [];
+  const headers = data[0];
+  data.slice(1, -1).forEach(function(values, index) {
+    let result = {};
+    headers.forEach((key, i) => (result[key] = values[i]));
+    newData.push(result);
+  });
+  return newData;
+}
+```
 
-### `npm test`
+we obtain an array of objects containing values for each of the dataset features:
+```
+[
+  0: {sepallength: "5.1", sepalwidth: "3.5", petallength: "1.4", petalwidth: "0.2"}
+  1: {sepallength: "4.9", sepalwidth: "3.0", petallength: "1.4", petalwidth: "0.2"}
+  2: {sepallength: "4.7", sepalwidth: "3.2", petallength: "1.3", petalwidth: "0.2"}
+  3: {sepallength: "4.6", sepalwidth: "3.1", petallength: "1.5", petalwidth: "0.2"}
+  4: {sepallength: "5.0", sepalwidth: "3.6", petallength: "1.4", petalwidth: "0.2"}
+  5: {sepallength: "5.4", sepalwidth: "3.9", petallength: "1.7", petalwidth: "0.4"}
+  ...
+]
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+At this point, perhaps you want to do additional preprocessing, such as removing all rows with null or empty values:
+```javascript
+function preprocessRemoveEmptyAndNull(data) {
+  data = data.filter(x => !Object.values(x).some(y => y === "" || y == null));
+  return data;
+}
+```
 
-### `npm run build`
+After defining a set of input and output features like this:
+```
+{
+  input:["petallength", "petalwidth"]
+  output: ["sepallength", "sepalwidth"]
+}
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+the following function may be used to obtain arrays of arrays containing the input and output features in appropriate order:
+```javascript
+function getFeatureTargetSplit(dataset, config) {
+  const inputs = config.input;
+  const outputs = config.output;
+  let features = [];
+  let targets = [];
+  dataset.forEach(function(dataRow) {
+    let featureRow = [];
+    inputs.forEach(function(inputName) {
+      featureRow.push(Number(dataRow[inputName]));
+    });
+    features.push(featureRow);
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+    let targetRow = [];
+    outputs.forEach(function(outputName) {
+      targetRow.push(Number(dataRow[outputName]));
+    });
+    targets.push(targetRow);
+  });
+  return [features, targets];
+}
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+So that if "sepalwidth" and "petallength" are chosen as input features, you end up with:
+```
+[
+  0: (2) [3.5, 1.4]
+  1: (2) [3, 1.4]
+  2: (2) [3.2, 1.3]
+  3: (2) [3.1, 1.5]
+  4: (2) [3.6, 1.4]
+  5: (2) [3.9, 1.7]
+  ...
+]
+```
 
-### `npm run eject`
+Furthermore, you may want to divide your data into training and testing data:
+```javascript
+function getTestTrainSplit(features, targets, test_train_split) {
+  const numberOfRows = features.length;
+  const numberOfTest = Math.round(numberOfRows * test_train_split);
+  const numberOfTrain = numberOfRows - numberOfTest;
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+  const x_train = features.slice(0, numberOfTrain - 1);
+  const x_test = features.slice(numberOfTrain - 1);
+  const y_train = targets.slice(0, numberOfTrain - 1);
+  const y_test = targets.slice(numberOfTrain - 1);
+  return [x_train, x_test, y_train, y_test];
+}
+```
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+and finally into tensors:
+```javascript
+function convertToTensors(x_train, x_test, y_train, y_test) {
+  const tensors = {};
+  tensors.trainFeatures = tf.tensor2d(x_train);
+  tensors.trainTargets = tf.tensor2d(y_train);
+  tensors.testFeatures = tf.tensor2d(x_test);
+  tensors.testTargets = tf.tensor2d(y_test);
+  return tensors;
+}
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
